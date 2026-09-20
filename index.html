@@ -73,8 +73,10 @@ const DB_KEY="youkai_medal_qr_db_v1";
 const OWN_KEY="youkai_medal_own_v1";
 let db=JSON.parse(localStorage.getItem(DB_KEY)||"{}");
 let own=JSON.parse(localStorage.getItem(OWN_KEY)||"{}");
-let stream=null, running=false, canvas=document.createElement("canvas"), ctx=canvas.getContext("2d",{willReadFrequently:true});
-
+let stream=null, running=false;
+let currentQR="";
+let canvas=document.createElement("canvas");
+let ctx=canvas.getContext("2d",{willReadFrequently:true});
 const video=document.getElementById("video");
 const scanner=document.getElementById("scanner");
 const status=document.getElementById("status");
