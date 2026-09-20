@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>妖怪メダル図鑑</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f9;color:#171717}
+header{background:#202124;color:#fff;padding:20px 16px;text-align:center}
+header h1{margin:0;font-size:23px}
+main{max-width:620px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:20px;padding:18px;margin-bottom:16px;box-shadow:0 5px 20px #00000012}
+button,label.btn{display:block;width:100%;border:0;border-radius:15px;padding:16px;margin:10px 0;font-size:17px;font-weight:750;text-align:center;cursor:pointer}
+.primary{background:#202124;color:#fff}
+.secondary{background:#e9edf4;color:#202124}
+#scanner{position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:18px;background:#111;display:none}
+#video{width:100%;height:100%;object-fit:cover}
+#guide{position:absolute;left:15%;top:15%;width:70%;height:70%;border:3px solid #fff;border-radius:20px;box-shadow:0 0 0 999px #0006}
+#status{padding:13px;border-radius:13px;background:#eef3ff;line-height:1.5}
+.hidden{display:none!important}
+.medal{display:flex;justify-content:space-between;align-items:center;border:1px solid #e7e9ee;border-radius:15px;padding:14px;margin-top:10px}
+.name{font-size:19px;font-weight:800}
+.count{color:#666;margin-top:4px}
+.raw{font-size:12px;color:#777;word-break:break-all;margin-top:8px}
+.small{font-size:12px;color:#6a6f78;line-height:1.55}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<header><h1>👻 妖怪メダル図鑑</h1></header>
+<main>
+<section class="card">
+<h2>QRスキャン</h2>
+<div id="scanner">
+  <video id="video" playsinline muted></video>
+  <div id="guide"></div>
+</div>
+<button id="start" class="primary" type="button">📷 カメラを開く</button>
+<button id="stop" class="secondary hidden" type="button">カメラを閉じる</button>
+<label class="btn secondary" for="imageInput">🖼️ QR画像から読み取る</label>
+<input id="imageInput" type="file" accept="image/*">
+
+<div id="status">カメラを開くと、QRを認識した瞬間に自動で読み取ります。</div>
+<div id="unknown" class="card hidden" style="margin-top:12px;background:#fafafa">
+  <b>このQRはまだ図鑑に登録されていません。</b>
+  <div id="raw" class="raw"></div>
+  <p class="small">QRの内容とメダル名の対応表が必要です。ここを登録すれば、次回から自動判定できます。</p>
+</div>
+</section>
+
+<section class="card">
+<h2>📚 所持メダル</h2>
+<div id="collection"></div>
+</section>
+</main>
+
+<!-- QR Scanner library. Camera access normally requires HTTPS or localhost. -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+const DB_KEY="youkai_medal_qr_db_v1";
+const OWN_KEY="youkai_medal_own_v1";
+let db=JSON.parse(localStorage.getItem(DB_KEY)||"{}");
+let own=JSON.parse(localStorage.getItem(OWN_KEY)||"{}");
+let stream=null, running=false, canvas=document.createElement("canvas"), ctx=canvas.getContext("2d",{willReadFrequently:true});
+
+const video=document.getElementById("video");
+const scanner=document.getElementById("scanner");
+const status=document.getElementById("status");
+const unknown=document.getElementById("unknown");
+const raw=document.getElementById("raw");
+
+function save(){
+ localStorage.setItem(DB_KEY,JSON.stringify(db));
+ localStorage.setItem(OWN_KEY,JSON.stringify(own));
+ render();
+}
+function render(){
+ const el=document.getElementById("collection");
+ const rows=Object.entries(own);
+ if(!rows.length){el.innerHTML="<p class='small'>まだメダルが登録されていません。</p>";return;}
+ el.innerHTML=rows.map(([name,count])=>`
+  <div class="medal">
+   <div><div class="name">👻 ${escapeHtml(name)}</div><div class="count">所持枚数：${count}枚</div></div>
+  </div>`).join("");
+}
+function escapeHtml(s){
+ return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function register(qr,name){
+ db[qr]=name;
+ own[name]=(own[name]||0)+1;
+ save();
+ unknown.classList.add("hidden");
+ status.textContent=`✅ ${name}を認識して登録しました！`;
+}
+function processQR(qr){
+ qr=qr.trim();
+ if(!qr)return;
+ // Exact QR payload lookup. This is the part that makes identification reliable.
+ const name=db[qr];
+ if(name){
+   own[name]=(own[name]||0)+1;
+   save();
+   status.textContent=`✅ ${name}を認識して登録しました！`;
+   return true;
+ }
+ unknown.classList.remove("hidden");
+ raw.textContent="QR内容："+qr;
+ status.textContent="QRを認識しました。ただし、このQRとメダル名の対応データがありません。";
+ return false;
+}
+async function startCamera(){
+ if(typeof jsQR==="undefined"){
+   status.textContent="QR読み取りライブラリを読み込めませんでした。インターネット接続を確認してください。";
+   return;
+ }
+ try{
+   stream=await navigator.mediaDevices.getUserMedia({
+     video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},
+     audio:false
+   });
+   video.srcObject=stream;
+   await video.play();
+   scanner.style.display="block";
+   document.getElementById("start").classList.add("hidden");
+   document.getElementById("stop").classList.remove("hidden");
+   running=true;
+   status.textContent="📷 QRを枠の中に入れてください。認識したら自動登録します。";
+   scanLoop();
+ }catch(e){
+   status.textContent="カメラを起動できませんでした。ブラウザのカメラ許可とHTTPS接続を確認してください。";
+ }
+}
+function stopCamera(){
+ running=false;
+ if(stream)stream.getTracks().forEach(t=>t.stop());
+ stream=null; video.srcObject=null;
+ scanner.style.display="none";
+ document.getElementById("start").classList.remove("hidden");
+ document.getElementById("stop").classList.add("hidden");
+}
+function scanLoop(){
+ if(!running)return;
+ if(video.readyState>=2 && video.videoWidth){
+   canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+   ctx.drawImage(video,0,0,canvas.width,canvas.height);
+   const image=ctx.getImageData(0,0,canvas.width,canvas.height);
+   const code=jsQR(image.data,image.width,image.height,{inversionAttempts:"attemptBoth"});
+   if(code && code.data){
+     processQR(code.data);
+     stopCamera(); // recognize once, then stop immediately
+     return;
+   }
+ }
+ requestAnimationFrame(scanLoop);
+}
+document.getElementById("start").onclick=startCamera;
+document.getElementById("stop").onclick=stopCamera;
+
+document.getElementById("imageInput").addEventListener("change",async e=>{
+ const file=e.target.files[0]; if(!file)return;
+ const bitmap=await createImageBitmap(file);
+ canvas.width=bitmap.width;canvas.height=bitmap.height;
+ ctx.drawImage(bitmap,0,0);
+ const image=ctx.getImageData(0,0,canvas.width,canvas.height);
+ const code=jsQR(image.data,image.width,image.height,{inversionAttempts:"attemptBoth"});
+ if(code&&code.data) processQR(code.data);
+ else status.textContent="QRを認識できませんでした。QR全体を明るく、正面から撮影してください。";
+ e.target.value="";
+});
+
+render();
+</script>
+</body>
+</html>
