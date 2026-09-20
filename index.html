@@ -110,7 +110,8 @@ function register(qr,name){
 function processQR(qr){
   qr=qr.trim();
   if(!qr)return;
-  // 今回読み取ったQRを保存
+ currentQR=qr;
+   // 今回読み取ったQRを保存
   currentQR=qr;
   // Exact QR payload lookup
   const name=db[qr];
