@@ -108,10 +108,12 @@ function register(qr,name){
  status.textContent=`✅ ${name}を認識して登録しました！`;
 }
 function processQR(qr){
- qr=qr.trim();
- if(!qr)return;
- // Exact QR payload lookup. This is the part that makes identification reliable.
- const name=db[qr];
+  qr=qr.trim();
+  if(!qr)return;
+  // 今回読み取ったQRを保存
+  currentQR=qr;
+  // Exact QR payload lookup
+  const name=db[qr];
  if(name){
    own[name]=(own[name]||0)+1;
    save();
