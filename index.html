@@ -182,8 +182,25 @@ document.getElementById("imageInput").addEventListener("change",async e=>{
  else status.textContent="QRを認識できませんでした。QR全体を明るく、正面から撮影してください。";
  e.target.value="";
 });
-
-render();
+document.getElementById("registerButton").onclick=()=>{
+ const name=document.getElementById("medalName").value.trim();
+ if(!name){
+   status.textContent="妖怪名を入力してください。";
+   return;
+ }
+ if(!currentQR){
+   status.textContent="QRを先に読み取ってください。";
+   return;
+ }
+ // QRと妖怪名を登録
+ db[currentQR]=name;
+ // 今回の1枚を所持数に追加
+ own[name]=(own[name]||0)+1;
+ save();
+ unknown.classList.add("hidden");
+ status.textContent=`🎉 ${name}を登録しました！ 所持枚数：${own[name]}枚`;
+ currentQR="";
+};render();
 </script>
 </body>
 </html>
